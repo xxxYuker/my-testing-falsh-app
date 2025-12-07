@@ -1,0 +1,16 @@
+[Unit]
+Description=Gunicorn instance to serve my flask project
+After=network.target
+
+[Service]
+# 咱们一直用的是 root 用户
+User=root
+# 你的项目代码所在的文件夹
+WorkingDirectory=/root/web项目
+# 启动命令 (指定用 python3 去运行 server.py)
+ExecStart=/usr/bin/python3 server.py
+# 总是自动重启 (如果程序崩溃了，或者服务器重启了)
+Restart=always
+
+[Install]
+WantedBy=multi-user.target

@@ -1,0 +1,13 @@
+server {
+    listen 80;
+    server_name _;
+
+    location / {
+        # 把 80 端口收到的客人，转交给 8080 的 Python
+        proxy_pass http://127.0.0.1:8080;
+        
+        # 把客人的真实 IP 告诉 Python
+        proxy_set_header Host $host;
+        proxy_set_header X-Real-IP $remote_addr;
+    }
+}
