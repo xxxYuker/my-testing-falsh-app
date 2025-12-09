@@ -1,0 +1,18 @@
+server {
+    listen 80;
+    # 👇 这里定义了你的子域名
+    server_name n8n.xdoworking.com;
+
+    location / {
+        # 转发给 N8N 的端口
+        proxy_pass http://127.0.0.1:5678;
+        
+        # N8N 必须的配置 (WebSocket支持)
+        proxy_set_header Connection 'Upgrade';
+        proxy_set_header Upgrade $http_upgrade;
+        proxy_set_header Host $host;
+        proxy_set_header X-Real-IP $remote_addr;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto $scheme;
+    }
+}

@@ -1,0 +1,109 @@
+{% extends "base.html" %}
+
+{% block title %}自动化工坊{% endblock %}
+
+{% block content %}
+<script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/github-markdown-css/5.2.0/github-markdown-light.min.css">
+
+<style>
+    /* 专门用来放周报的盒子 */
+    .report-box {
+        background: #fff;
+        border: 1px solid #e1e4e8;
+        border-radius: 6px;
+        padding: 30px;
+        margin-top: 20px;
+        box-shadow: 0 4px 15px rgba(0,0,0,0.05);
+    }
+</style>
+
+<div class="text-center mb-5">
+    <h1 class="display-5 fw-bold">⚡ 自动化工坊</h1>
+    <p class="lead text-muted">AI 赋能，效率倍增。</p>
+</div>
+
+{% if report_content %}
+    <div class="row justify-content-center mb-5">
+        <div class="col-md-10">
+            
+            <div class="d-flex align-items-center mb-3 text-success">
+                <i class="bi bi-check-circle-fill fs-3 me-2"></i>
+                <h4 class="mb-0">周报已生成</h4>
+            </div>
+            
+            <div class="report-box markdown-body bg-white p-5 rounded shadow-sm border">
+                
+                <div id="raw-content" style="display:none;">{{ report_content }}</div>
+                
+                <div id="rendered-content"></div>
+                
+            </div>
+            
+            <div class="text-end mt-2">
+                <button class="btn btn-outline-secondary btn-sm" onclick="navigator.clipboard.writeText(document.getElementById('raw-content').innerText); alert('已复制！')">
+                    <i class="bi bi-clipboard"></i> 复制内容
+                </button>
+            </div>
+            
+        </div>
+    </div>
+{% endif %}
+
+<div class="row g-4 justify-content-center mt-3">
+    <div class="col-md-5">
+        <div class="card h-100 text-center p-4 hover-shadow border-primary">
+            <div class="card-body">
+                <i class="bi bi-file-earmark-spreadsheet text-primary display-1 mb-3"></i>
+                <h4 class="card-title">AI 周报助手</h4>
+                <p class="card-text text-muted">输入碎片工作，生成完美周报。</p>
+                <button type="button" class="btn btn-primary mt-3 px-4" data-bs-toggle="modal" data-bs-target="#reportModal">
+                    ✨ 立即生成
+                </button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="modal fade" id="reportModal" tabindex="-1">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">📝 生成本周周报</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <form action="/generate_report" method="POST">
+                <div class="modal-body">
+                    <div class="mb-3">
+                        <label class="form-label">本周工作要点</label>
+                        <textarea name="work_items" class="form-control" rows="6" placeholder="例如：
+1. 完成了 N8N 部署
+2. 修复了 HTTPS 证书问题..." required></textarea>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">取消</button>
+                    <button type="submit" class="btn btn-primary" onclick="this.innerHTML='⏳ 生成中...';">🤖 开始生成</button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+
+<script>
+    // 等页面加载完
+    document.addEventListener("DOMContentLoaded", function() {
+        // 拿到原始文本
+        var rawText = document.getElementById('raw-content');
+        if (rawText) {
+            var text = rawText.innerText;
+            // 剔除掉 Flask 可能加在前面的 "✅ 周报生成成功！内容如下：" 这类提示词（如果在 app.py 里加了的话）
+            // 如果 app.py 里直接 flash(response.text)，那就不用剔除
+            
+            // 使用 marked 库把 Markdown 变成 HTML
+            document.getElementById('rendered-content').innerHTML = marked.parse(text);
+        }
+    });
+</script>
+
+{% endblock %}

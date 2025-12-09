@@ -1,3 +1,4 @@
+import requests
 import os
 from flask import Flask, render_template, request, redirect, url_for, flash, jsonify # <--- 注意这里加了 jsonify
 from flask_sqlalchemy import SQLAlchemy
@@ -130,6 +131,44 @@ def api_post_message():
     db.session.commit()
 
     return jsonify({"status": "success", "message": "API留言成功"}), 201
+
+# ...
+
+@app.route('/n8n-tools')
+@login_required  # 只有登录了才能进工坊
+def n8n_tools():
+    return render_template('n8n_tools.html')
+
+@app.route('/generate_report', methods=['POST'])
+@login_required
+def generate_report():
+    work_items = request.form.get('work_items')
+    
+    payload = {
+        "user": current_user.username,
+        "raw_text": work_items
+    }
+    
+    # 你的 N8N 地址
+    n8n_url = "https://n8n.xdoworking.com/webhook/AI-Report"
+    
+    try:
+        response = requests.post(n8n_url, json=payload, timeout=30)
+        
+        if response.status_code == 200:
+            # ✅ 改动在这里：
+            # 不再用 flash()，而是把 generated_text 作为一个变量传给网页
+            return render_template('n8n_tools.html', report_content=response.text)
+        else:
+            error_msg = f"❌ N8N 报错 (代码 {response.status_code}): {response.text}"
+            print(error_msg)  # 在终端里也打印一下方便看
+            flash(error_msg)
+            
+    except Exception as e:
+        flash(f"❌ 出错: {str(e)}")
+
+    # 如果出错，还是跳回原页面
+    return redirect(url_for('n8n_tools'))
 
 if __name__ == "__main__":
     with app.app_context():
