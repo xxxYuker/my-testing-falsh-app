@@ -1,5 +1,5 @@
 import os
-from flask import Flask, render_template, request, redirect, url_for, flash
+from flask import Flask, render_template, request, redirect, url_for, flash, jsonify # <--- 注意这里加了 jsonify
 from flask_sqlalchemy import SQLAlchemy
 from flask_login import LoginManager, UserMixin, login_user, login_required, logout_user, current_user
 from werkzeug.security import generate_password_hash, check_password_hash
@@ -10,11 +10,11 @@ app = Flask(__name__)
 basedir = os.path.abspath(os.path.dirname(__file__))
 app.config['SQLALCHEMY_DATABASE_URI'] = 'sqlite:///' + os.path.join(basedir, 'data.db')
 app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
-app.config['SECRET_KEY'] = 'wo-de-mima-shi-shen-me' # 必须有密钥才能用 Session
+app.config['SECRET_KEY'] = 'wo-de-mima-shi-shen-me'
 
 db = SQLAlchemy(app)
 
-# 初始化登录管理
+# 登录管理
 login_manager = LoginManager()
 login_manager.init_app(app)
 login_manager.login_view = 'login'
@@ -38,25 +38,19 @@ class User(UserMixin, db.Model):
 class Message(db.Model):
     id = db.Column(db.Integer, primary_key=True)
     content = db.Column(db.String(200))
-    # 关联 User 表的 id
     user_id = db.Column(db.Integer, db.ForeignKey('user.id'))
-    # 让我们可以用 message.author 拿到对应的 User 对象
     author = db.relationship('User', backref='messages')
 
 # ================= 路由逻辑 =================
 
 @app.route("/", methods=['GET', 'POST'])
 def home():
-    # 处理发帖逻辑
     if request.method == 'POST':
-        # 如果没登录就想发帖，甚至不会显示提交按钮，但为了安全再防一手
         if not current_user.is_authenticated:
             return redirect(url_for('login'))
         
         content = request.form.get('content')
-        # 创建留言时，自动填入当前登录用户的 id
         new_msg = Message(content=content, author=current_user)
-        
         db.session.add(new_msg)
         db.session.commit()
         return redirect("/")
@@ -64,6 +58,7 @@ def home():
     all_messages = Message.query.all()
     return render_template("index.html", messages=all_messages)
 
+# --- 登录/注册/注销 (保持不变) ---
 @app.route('/register', methods=['GET', 'POST'])
 def register():
     if request.method == 'POST':
@@ -80,32 +75,61 @@ def register():
         return redirect(url_for('home'))
     return render_template('register.html')
 
-# --- 新增：登录路由 ---
 @app.route('/login', methods=['GET', 'POST'])
 def login():
     if request.method == 'POST':
         username = request.form.get('username')
         password = request.form.get('password')
-        
-        # 1. 找人：去数据库查有没有这个名字
         user = User.query.filter_by(username=username).first()
-        
-        # 2. 验密：如果人存在，且密码对得上
         if user and user.check_password(password):
-            login_user(user) # 发放通行证
+            login_user(user)
             return redirect(url_for('home'))
-        
-        # 3. 失败：报错
-        flash('账号或密码错误，请重试。')
-
+        flash('账号或密码错误')
     return render_template('login.html')
 
-# --- 新增：登出路由 ---
 @app.route('/logout')
-@login_required # 只有登录的人才能访问这个路由
+@login_required
 def logout():
-    logout_user() # 收回通行证
+    logout_user()
     return redirect(url_for('home'))
+
+# ================= 🆕 新增：API 接口 (给 Postman/机器人用的) =================
+# 修改 api_post_message 函数，替换原来的
+
+@app.route('/api/post_message', methods=['POST'])
+def api_post_message():
+    # --- 🔒 第一关：检查暗号 ---
+    # 我们规定：请求头里必须带一个叫 'Authorization' 的字段
+    # 它的值必须是 'my-secret-token-123' (你自己随便定)
+    token = request.headers.get('Authorization')
+    
+    if token != 'my-secret-token-123333':
+        # 如果暗号不对，直接返回 403 (禁止访问)
+        return jsonify({"status": "error", "message": "你是谁？暗号不对！"}), 403
+
+    # --- 第二关：正常处理数据 (和之前一样) ---
+    data = request.get_json()
+    if not data:
+        return jsonify({"status": "error", "message": "没收到数据"}), 400
+
+    username = data.get('username', 'Bot')
+    content = data.get('content')
+
+    if not content:
+        return jsonify({"status": "error", "message": "内容不能为空"}), 400
+
+    bot_user = User.query.filter_by(username=username).first()
+    if not bot_user:
+        bot_user = User(username=username)
+        bot_user.set_password('123456')
+        db.session.add(bot_user)
+        db.session.commit()
+
+    new_msg = Message(content=content, author=bot_user)
+    db.session.add(new_msg)
+    db.session.commit()
+
+    return jsonify({"status": "success", "message": "API留言成功"}), 201
 
 if __name__ == "__main__":
     with app.app_context():
