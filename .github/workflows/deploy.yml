@@ -36,6 +36,6 @@ jobs:
       # 新增的通知步骤
       - name: 🔔 Notify N8N
         run: |
-          curl -X POST ${{ N8N_PUBLIC_TELEGRAM_PUSH }} \
+          curl -X POST ${{ N8N_WEBHOOK_URL }} \
           -H "Content-Type: application/json" \
           -d '{"status": "success", "message": "GitHub Actions部署完成！"}'
