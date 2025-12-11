@@ -153,7 +153,9 @@ def generate_report():
     n8n_url = "https://n8n.xdoworking.com/webhook/AI-Report"
     
     try:
-        response = requests.post(n8n_url, json=payload, timeout=30)
+        response = requests.post(n8n_url, json=payload, timeout=120)
+        print(f"DEBUG状态码: {response.status_code}", flush=True)
+        print(f"DEBUG内容: {response.text[:200]}", flush=True)
         
         if response.status_code == 200:
             # ✅ 改动在这里：
