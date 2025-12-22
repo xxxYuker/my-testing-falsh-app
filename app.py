@@ -149,30 +149,67 @@ def generate_report():
         "raw_text": work_items
     }
     
-    # 你的 N8N 地址
     n8n_url = "https://n8n.xdoworking.com/webhook/AI-Report"
     
     try:
-        response = requests.post(n8n_url, json=payload, timeout=120)
-        print(f"DEBUG状态码: {response.status_code}", flush=True)
-        print(f"DEBUG内容: {response.text[:200]}", flush=True)
+        response = requests.post(n8n_url, json=payload, timeout=30)
         
-        if response.status_code == 200:
-            # ✅ 改动在这里：
-            # 不再用 flash()，而是把 generated_text 作为一个变量传给网页
+        if response.ok:
             return render_template('n8n_tools.html', report_content=response.text)
         else:
             error_msg = f"❌ N8N 报错 (代码 {response.status_code}): {response.text}"
-            print(error_msg)  # 在终端里也打印一下方便看
+            print(error_msg, flush=True)
             flash(error_msg)
             
     except Exception as e:
         flash(f"❌ 出错: {str(e)}")
 
-    # 如果出错，还是跳回原页面
     return redirect(url_for('n8n_tools'))
+
+
+@app.route('/generate_twitter', methods=['POST'])
+@login_required
+def generate_twitter():
+    project_name = request.form.get('project_name')
+    user_request = request.form.get('user_request')
+    style = request.form.get('style')
+    use_search = 'use_search' in request.form
+    need_image = 'need_image' in request.form
+
+    payload = {
+        "user": current_user.username,
+        "project_name": project_name,
+        "user_request": user_request,
+        "style": style,
+        "use_search": use_search,
+        "need_image": need_image,
+    }
+
+    n8n_url = "https://n8n.xdoworking.com/webhook/twitter-engine-v1"
+
+    try:
+        response = requests.post(n8n_url, json=payload, timeout=120)
+        print(f"DEBUG状态码: {response.status_code}", flush=True)
+        print(f"DEBUG内容: {response.text[:200]}", flush=True)
+
+        if response.ok:
+            try:
+                twitter_result = response.json()
+            except ValueError:
+                twitter_result = response.text
+            return render_template('n8n_tools.html', twitter_result=twitter_result)
+        else:
+            error_msg = f"❌ N8N 报错 (代码 {response.status_code}): {response.text}"
+            print(error_msg, flush=True)
+            flash(error_msg)
+
+    except Exception as e:
+        flash(f"❌ 出错: {str(e)}")
+
+    return redirect(url_for('n8n_tools'))
+
 
 if __name__ == "__main__":
     with app.app_context():
         db.create_all()
-    app.run(debug=True)
+    app.run(debug=True) 
