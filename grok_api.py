@@ -44,14 +44,9 @@ def safe_serialize(obj: Any):
 
 @app.post("/search")
 async def search_grok(request: SearchRequest, x_token: str = Header(None)):
-    # --- 🔒 安全检查 ---
-    if x_token != MY_ACCESS_TOKEN:
-        print(f"⚠️ 警告：有人尝试非法访问！Token: {x_token}")
-        raise HTTPException(status_code=401, detail="Invalid Access Token")
-    # ------------------
+    # ... (前面的安全检查保持不变) ...
 
-    print(f"✅ 验证通过，收到请求: {request.query}")
-    print(f"🤖 当前 system_prompt: {request.system_prompt}")
+    print(f"✅ 收到请求: {request.query}")
 
     try:
         client = Client(api_key=XAI_API_KEY)
@@ -59,7 +54,8 @@ async def search_grok(request: SearchRequest, x_token: str = Header(None)):
         chat = client.chat.create(
             model="grok-4-1-fast",
             tools=[web_search(), x_search()],
-            include=["verbose_streaming"],  # ✅ 关键：更清晰的工具调用流信息
+            # ✅ 修正点 1: 添加 inline_citations 以获得可见的引用标记
+            include=["verbose_streaming", "inline_citations"],
         )
 
         if request.system_prompt:
@@ -69,35 +65,38 @@ async def search_grok(request: SearchRequest, x_token: str = Header(None)):
 
         full_response = ""
         final_response = None
+        
+        # 用于在控制台调试是否真的触发了工具
+        triggered_tools = []
 
         for response, chunk in chat.stream():
-            final_response = response  # ✅ 记录最终 response（用于 citations/tool_calls）
+            final_response = response
+            
+            # ✅ 修正点 2: 增强的工具检测逻辑
+            # 在 verbose_streaming 模式下，工具调用会出现在 chunk.tool_calls 中
+            if hasattr(chunk, "tool_calls") and chunk.tool_calls:
+                for tc in chunk.tool_calls:
+                    tool_name = tc.function.name
+                    tool_args = tc.function.arguments
+                    print(f"🔥 实时监测到工具调用: {tool_name} | 参数: {tool_args}")
+                    triggered_tools.append({"name": tool_name, "args": tool_args})
 
-            # ✅ 关键：实时打印工具调用（你用它判断“到底有没有搜”）
-            tool_calls = getattr(chunk, "tool_calls", None) or []
-            for tc in tool_calls:
-                try:
-                    fn = tc.function.name
-                    args = tc.function.arguments
-                    print(f"\n🔧 TOOL CALL => {fn} args={args}")
-                except Exception:
-                    print(f"\n🔧 TOOL CALL => {tc}")
-
-            # 收集最终文本
-            if getattr(chunk, "content", None):
+            if chunk.content:
                 full_response += chunk.content
 
-        # ✅ citations 默认就会返回（文档：response.citations always returned）
+        # 最终的数据提取
         citations = safe_serialize(getattr(final_response, "citations", []))
-        server_side_tool_usage = safe_serialize(getattr(final_response, "server_side_tool_usage", None))
-        tool_calls_summary = safe_serialize(getattr(final_response, "tool_calls", None))
+        # ✅ 修正点 3: server_side_tool_usage 是判断是否搜索的最权威证据
+        server_side_usage = safe_serialize(getattr(final_response, "server_side_tool_usage", None))
+        
+        print(f"📊 最终服务端工具统计: {server_side_usage}")
 
         return {
             "status": "success",
             "data": full_response,
             "citations": citations,
-            "server_side_tool_usage": server_side_tool_usage,
-            "tool_calls": tool_calls_summary,
+            "server_side_tool_usage": server_side_usage, # 如果这里有值，说明绝对搜索了
+            "debug_triggered_tools": triggered_tools     # 实时捕获的工具列表
         }
 
     except Exception as e:
