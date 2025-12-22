@@ -42,7 +42,7 @@ async def search_grok(
     try:
         client = Client(api_key=XAI_API_KEY)
         chat = client.chat.create(
-            model="grok-4", # 建议确认一下模型名称，有时是 grok-beta 或 grok-2
+            model="grok-4-1-fast-reasoning", # 建议确认一下模型名称，有时是 grok-beta 或 grok-2
             tools=[web_search(), x_search()],
         )
         
