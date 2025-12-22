@@ -5,6 +5,9 @@ from xai_sdk.chat import user, system
 from xai_sdk.tools import web_search, x_search
 import os
 from typing import Any
+import logging, time, uuid
+log = logging.getLogger("app")
+logging.basicConfig(level=logging.INFO)
 
 # ================= 配置区域 =================
 XAI_API_KEY = os.getenv("XAI_API_KEY", "").strip()
@@ -44,19 +47,20 @@ def safe_serialize(obj: Any):
 
 @app.post("/search")
 async def search_grok(request: SearchRequest, x_token: str = Header(None)):
-    # ... (前面的安全检查保持不变) ...
-
-    print(f"✅ 收到请求: {request.query}")
+    rid = str(uuid.uuid4())
+    t0 = time.time()
+    log.info(f"[{rid}] /search start query={request.query!r}")
 
     try:
         client = Client(api_key=XAI_API_KEY)
 
+        log.info(f"[{rid}] TOOL grok_chat.create start tools=[web_search,x_search]")
         chat = client.chat.create(
             model="grok-4-1-fast",
             tools=[web_search(), x_search()],
-            # ✅ 修正点 1: 添加 inline_citations 以获得可见的引用标记
             include=["verbose_streaming", "inline_citations"],
         )
+        log.info(f"[{rid}] TOOL grok_chat.create end cost_ms={(time.time()-t0)*1000:.1f}")
 
         if request.system_prompt:
             chat.append(system(request.system_prompt))
@@ -65,43 +69,41 @@ async def search_grok(request: SearchRequest, x_token: str = Header(None)):
 
         full_response = ""
         final_response = None
-        
-        # 用于在控制台调试是否真的触发了工具
         triggered_tools = []
 
+        # 注意：这里的工具调用是“流式过程中的事件”，不代表一定每次都会触发
         for response, chunk in chat.stream():
             final_response = response
-            
-            # ✅ 修正点 2: 增强的工具检测逻辑
-            # 在 verbose_streaming 模式下，工具调用会出现在 chunk.tool_calls 中
+
             if hasattr(chunk, "tool_calls") and chunk.tool_calls:
                 for tc in chunk.tool_calls:
                     tool_name = tc.function.name
                     tool_args = tc.function.arguments
-                    print(f"🔥 实时监测到工具调用: {tool_name} | 参数: {tool_args}")
+                    log.info(f"[{rid}] TOOL_CALL {tool_name} args={tool_args}")
                     triggered_tools.append({"name": tool_name, "args": tool_args})
 
-            if chunk.content:
+            if getattr(chunk, "content", None):
                 full_response += chunk.content
 
-        # 最终的数据提取
         citations = safe_serialize(getattr(final_response, "citations", []))
-        # ✅ 修正点 3: server_side_tool_usage 是判断是否搜索的最权威证据
         server_side_usage = safe_serialize(getattr(final_response, "server_side_tool_usage", None))
-        
-        print(f"📊 最终服务端工具统计: {server_side_usage}")
+
+        log.info(f"[{rid}] /search end cost_ms={(time.time()-t0)*1000:.1f} "
+                 f"server_side_tool_usage={server_side_usage}")
 
         return {
             "status": "success",
             "data": full_response,
             "citations": citations,
-            "server_side_tool_usage": server_side_usage, # 如果这里有值，说明绝对搜索了
-            "debug_triggered_tools": triggered_tools     # 实时捕获的工具列表
+            "server_side_tool_usage": server_side_usage,
+            "debug_triggered_tools": triggered_tools,
+            "rid": rid,
         }
 
     except Exception as e:
-        print(f"出错: {e}")
+        log.exception(f"[{rid}] /search error: {e}")
         raise HTTPException(status_code=500, detail=str(e))
+
 
 
 if __name__ == "__main__":
