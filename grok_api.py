@@ -12,7 +12,7 @@ XAI_API_KEY = os.getenv("XAI_API_KEY", "").strip()
 # 你可以随便设一个复杂的字符串，比如 "n8n-secret-password-2025"
 MY_ACCESS_TOKEN = os.getenv("MY_ACCESS_TOKEN", "").strip()
 
-if not token:
+if not XAI_API_KEY:
     print("⚠️ 警告: 未检测到 XAI_API_KEY，服务可能无法正常工作！")
 # ===========================================
 
