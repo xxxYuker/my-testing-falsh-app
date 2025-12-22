@@ -1,15 +1,12 @@
 from fastapi import FastAPI, HTTPException, Header
 from pydantic import BaseModel
 from xai_sdk import Client
-from xai_sdk.chat import user
+from xai_sdk.chat import user, system  # ✅ 1. 这里引入了 system (你之前做对了)
 from xai_sdk.tools import web_search, x_search
 import os
 
 # ================= 配置区域 =================
-# 1. xAI 的 Key (用于调用 AI)
 XAI_API_KEY = os.getenv("XAI_API_KEY", "").strip()
-# 2. 自定义的访问密码 (用于保护你的 API)
-# 你可以随便设一个复杂的字符串，比如 "n8n-secret-password-2025"
 MY_ACCESS_TOKEN = os.getenv("MY_ACCESS_TOKEN", "").strip()
 
 if not XAI_API_KEY:
@@ -18,13 +15,15 @@ if not XAI_API_KEY:
 
 app = FastAPI()
 
+# ✅ 2. 修改这里：增加 system_prompt 字段
 class SearchRequest(BaseModel):
     query: str
+    # 默认人设，如果 n8n 不传这个参数，就用下面这句话
+    system_prompt: str = "你是一个有用的AI助手。" 
 
 @app.post("/search")
 async def search_grok(
     request: SearchRequest, 
-    # 这里增加了一个参数，要求请求头里必须包含 x-token
     x_token: str = Header(None) 
 ):
     """
@@ -38,13 +37,19 @@ async def search_grok(
     # ------------------
 
     print(f"✅ 验证通过，收到请求: {request.query}")
+    print(f"🤖 当前人设: {request.system_prompt}") # 打印一下方便调试
     
     try:
         client = Client(api_key=XAI_API_KEY)
         chat = client.chat.create(
-            model="grok-4",
+            model="grok-beta", # 建议确认一下模型名称，有时是 grok-beta 或 grok-2
             tools=[web_search(), x_search()],
         )
+        
+        # ✅ 3. 修改这里：把 system_prompt 塞给 AI
+        if request.system_prompt:
+            chat.append(system(request.system_prompt))
+            
         chat.append(user(request.query))
         
         full_response = ""
