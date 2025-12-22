@@ -7,7 +7,7 @@ import os
 
 # ================= 配置区域 =================
 # 1. xAI 的 Key (用于调用 AI)
-token = os.getenv("XAI_API_KEY", "").strip()
+XAI_API_KEY = os.getenv("XAI_API_KEY", "").strip()
 # 2. 自定义的访问密码 (用于保护你的 API)
 # 你可以随便设一个复杂的字符串，比如 "n8n-secret-password-2025"
 MY_ACCESS_TOKEN = os.getenv("MY_ACCESS_TOKEN", "").strip()
