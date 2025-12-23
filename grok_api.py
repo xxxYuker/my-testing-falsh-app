@@ -9,6 +9,8 @@ import logging, time, uuid
 log = logging.getLogger("app")
 logging.basicConfig(level=logging.INFO)
 
+
+
 # ================= 配置区域 =================
 XAI_API_KEY = os.getenv("XAI_API_KEY", "").strip()
 MY_ACCESS_TOKEN = os.getenv("MY_ACCESS_TOKEN", "").strip()
@@ -57,8 +59,8 @@ async def search_grok(request: SearchRequest, x_token: str = Header(None)):
         log.info(f"[{rid}] TOOL grok_chat.create start tools=[web_search,x_search]")
         chat = client.chat.create(
             model="grok-4-1-fast",
-            tools=[web_search(), x_search()],
             include=["verbose_streaming", "inline_citations"],
+            tools=[web_search(), x_search()]
         )
         log.info(f"[{rid}] TOOL grok_chat.create end cost_ms={(time.time()-t0)*1000:.1f}")
 
